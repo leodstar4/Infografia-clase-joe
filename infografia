@@ -1,0 +1,302 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/INFOGRAFIA_DJANGO.md b/INFOGRAFIA_DJANGO.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a949f0d5b22c0496c89c3be95e5e116fef1781e4
+--- /dev/null
++++ b/INFOGRAFIA_DJANGO.md
+@@ -0,0 +1,331 @@
++# 🧭 Infografía rápida: Flujo base de trabajo con Django
++
++> Guía práctica para crear un entorno, proyecto y app en Django, conectar base de datos y habilitar URLs para listar y crear artículos/publicaciones.
++
++---
++
++## 0) Crear ambiente virtual + librerías necesarias
++
++```bash
++# 1. Ir a tu carpeta de trabajo
++cd ruta/de/tu/proyecto
++
++# 2. Crear ambiente virtual (Linux/macOS)
++python3 -m venv .venv
++
++# 3. Activar ambiente virtual
++source .venv/bin/activate
++
++# (Windows PowerShell)
++# py -m venv .venv
++# .\.venv\Scripts\Activate.ps1
++
++# 4. Instalar Django y utilidades comunes
++pip install django mysqlclient python-decouple
++
++# 5. Congelar dependencias
++pip freeze > requirements.txt
++```
++
++✅ Resultado esperado:
++- Ambiente virtual activo.
++- Django instalado.
++- Archivo `requirements.txt` listo para compartir.
++
++---
++
++## 1) Crear un proyecto Django + habilitar base de datos
++
++```bash
++# Crear proyecto
++django-admin startproject config .
++
++# Ejecutar servidor para validar
++python manage.py runserver
++```
++
++### Configurar base de datos en `config/settings.py` (Laragon)
++
++Ejemplo con **MySQL/MariaDB** en Laragon:
++
++```python
++DATABASES = {
++    'default': {
++        'ENGINE': 'django.db.backends.mysql',
++        'NAME': 'mi_bd_laragon',
++        'USER': 'root',
++        'PASSWORD': '',  # en Laragon suele venir vacía por defecto
++        'HOST': '127.0.0.1',
++        'PORT': '3306',
++    }
++}
++```
++
++> Si en tu Laragon configuraste contraseña para `root`, reemplaza `PASSWORD` con ese valor.
++
++### Aplicar migraciones iniciales
++
++```bash
++python manage.py migrate
++```
++
++✅ Resultado esperado:
++- Proyecto creado.
++- Base de datos enlazada.
++- Tablas base de Django creadas.
++
++---
++
++## 2) Crear una app + modificar `settings.py`
++
++```bash
++# Crear app
++python manage.py startapp members
++```
++
++Agregar la app en `INSTALLED_APPS` (archivo `config/settings.py`):
++
++```python
++INSTALLED_APPS = [
++    # apps de Django...
++    'members',
++]
++```
++
++✅ Resultado esperado:
++- App creada con su estructura base.
++- Django reconoce la app para modelos, vistas, templates y migraciones.
++
++---
++
++## 3) Repaso de estructura de archivos y carpetas
++
++```text
++mi_proyecto/
++├── manage.py
++├── requirements.txt
++├── config/
++│   ├── __init__.py
++│   ├── settings.py   # configuración global
++│   ├── urls.py       # ruteo principal
++│   ├── asgi.py
++│   └── wsgi.py
++└── members/
++    ├── admin.py
++    ├── apps.py
++    ├── models.py     # artículos/tablas
++    ├── views.py      # lógica HTTP
++    ├── tests.py
++    ├── migrations/
++    └── templates/
++        └── members/
++            ├── lista_articulos.html
++            └── nuevo_articulo.html
++```
++
++---
++
++## 4) Probar modificaciones en Django
++
++Con base de datos activa y correctamente configurada:
++
++```bash
++# 1) Crear migraciones cuando cambies models.py
++python manage.py makemigrations
++
++# 2) Aplicarlas a la base
++python manage.py migrate
++
++# 3) Levantar servidor
++python manage.py runserver
++
++# 4) (Opcional) ejecutar tests
++python manage.py test
++```
++
++### Checklist rápido
++- ¿No hay errores de conexión a DB?
++- ¿Migraciones aplicadas?
++- ¿URL responde 200 OK?
++- ¿Template carga correctamente?
++
++---
++
++## 5) URL para mostrar todos los artículos en 1 página
++
++### Paso A: definir modelo (ejemplo)
++
++`members/models.py`
++
++```python
++from django.db import models
++
++class Articulo(models.Model):
++    titulo = models.CharField(max_length=150)
++    contenido = models.TextField()
++    autor = models.CharField(max_length=120)
++    fecha_publicacion = models.DateTimeField(auto_now_add=True)
++
++    def __str__(self):
++        return self.titulo
++```
++
++Migrar:
++
++```bash
++python manage.py makemigrations
++python manage.py migrate
++```
++
++### Paso B: crear vista de listado
++
++`members/views.py`
++
++```python
++from django.shortcuts import render
++from .models import Articulo
++
++def lista_articulos(request):
++    articulos = Articulo.objects.all().order_by('-fecha_publicacion')
++    return render(request, 'members/lista_articulos.html', {'articulos': articulos})
++```
++
++### Paso C: configurar URL de app y proyecto
++
++`members/urls.py`
++
++```python
++from django.urls import path
++from . import views
++
++urlpatterns = [
++    path('articulos/', views.lista_articulos, name='lista_articulos'),
++]
++```
++
++`config/urls.py`
++
++```python
++from django.contrib import admin
++from django.urls import path, include
++
++urlpatterns = [
++    path('admin/', admin.site.urls),
++    path('', include('members.urls')),
++]
++```
++
++### Paso D: crear template de listado
++
++`members/templates/members/lista_articulos.html`
++
++```html
++<h1>Listado de artículos</h1>
++<ul>
++  {% for articulo in articulos %}
++    <li>
++      <strong>{{ articulo.titulo }}</strong> — {{ articulo.autor }}<br>
++      {{ articulo.contenido|truncatechars:120 }}
++    </li>
++  {% empty %}
++    <li>No hay artículos registrados.</li>
++  {% endfor %}
++</ul>
++```
++
++✅ URL final: `http://127.0.0.1:8000/articulos/`
++
++---
++
++## 6) URL para crear un nuevo artículo
++
++### Paso A: crear formulario simple en vista
++
++`members/views.py`
++
++```python
++from django.shortcuts import render, redirect
++from .models import Articulo
++
++def crear_articulo(request):
++    if request.method == 'POST':
++        titulo = request.POST.get('titulo')
++        contenido = request.POST.get('contenido')
++        autor = request.POST.get('autor')
++        Articulo.objects.create(titulo=titulo, contenido=contenido, autor=autor)
++        return redirect('lista_articulos')
++    return render(request, 'members/nuevo_articulo.html')
++```
++
++### Paso B: agregar URL
++
++`members/urls.py`
++
++```python
++urlpatterns = [
++    path('articulos/', views.lista_articulos, name='lista_articulos'),
++    path('articulos/nuevo/', views.crear_articulo, name='crear_articulo'),
++]
++```
++
++### Paso C: crear template con formulario
++
++`members/templates/members/nuevo_articulo.html`
++
++```html
++<h1>Nuevo artículo</h1>
++<form method="post">
++  {% csrf_token %}
++  <label>Título:</label>
++  <input type="text" name="titulo" required>
++
++  <label>Contenido:</label>
++  <textarea name="contenido" rows="6" required></textarea>
++
++  <label>Autor:</label>
++  <input type="text" name="autor" required>
++
++  <button type="submit">Guardar</button>
++</form>
++```
++
++✅ URL final: `http://127.0.0.1:8000/articulos/nuevo/`
++
++---
++
